@@ -12,3 +12,7 @@ with open ('landscape.jpg', 'rb') as f:
     )
 
 print(response['message']['content'])
+
+# # Add project root to sys.path to import logger
+# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# from logger import get_logger
