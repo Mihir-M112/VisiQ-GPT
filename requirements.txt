@@ -1,17 +1,16 @@
-torch
-torchvision
-transformers
-ollama
-byaldi
-docx2pdf
 fastapi
-hf_transfer
-pyttsx3
-docx2pdf
-# dotenv
-groq
-vllm
-google-generativeai
-mistral_common
-mistral_inference
-qwen-vl-utils
+uvicorn
+streamlit
+doc2pdf
+pymongo
+transformers
+pypdf2
+chromadb            # Vector store
+pillow              # Image processing
+pypdf2              # PDF handling
+ollama              # For local Llama model integration
+llama-index         # RAG framework (optional)
+sentence-transformers  # Sentence embeddings
+PyMuPDF            # PDF handling
+langchain-community # Language models
+# python-dotenv       # Environment variables

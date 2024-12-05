@@ -1,114 +1,139 @@
-import os
-import torch
-from transformers import AutoProcessor, AutoModelForCausalLM
-from dotenv import load_dotenv
-import google.generativeai as genai
 import sys
+import os
+import requests
+import json
+import base64
+from typing import Optional
+import time
+import ollama
 
-# Add project root to sys.path to import logger
+
+# Add the root directory to the sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from logger import get_logger
+from utils.logger import get_logger
 
-# Load environment variables
-load_dotenv()
-
-# Initialize logger
 logger = get_logger(__name__)
 
-# Cache for loaded models
-_model_cache = {}
+OLLAMA_URL = "http://localhost:11434/api/generate"
 
-# Function to detect the best available device
-def detect_device():
-    if torch.cuda.is_available():
-        return 'cuda'
-    elif torch.backends.mps.is_available():
-        return 'mps'
-    else:
-        return 'cpu'
 
-# Function to load the selected model
-def load_model(model_choice):
-    """
-    Load and cache the specified model.
-
-    Args:
-        model_choice (str): 'llama3.2', 'llama3.2-vision', or 'gemini'
-
-    Returns:
-        tuple: model, processor (if applicable), device (if applicable)
-    """
-    global _model_cache
-
-    # Check if the model is already loaded
-    if model_choice in _model_cache:
-        logger.info(f"Model '{model_choice}' loaded from cache.")
-        return _model_cache[model_choice]
-
+def encode_image_to_base64(image_path: str) -> str:
+    """Convert image to base64 encoded string."""
     try:
-        # Handle Google Gemini model
-        if model_choice == 'gemini':
-            api_key = os.getenv("GOOGLE_API_KEY")
-            if not api_key:
-                logger.error("GOOGLE_API_KEY not found in .env file.")
-                raise ValueError("GOOGLE_API_KEY not found in .env file.")
-
-            genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-1.5-flash-002')
-            logger.info("Google Gemini model loaded successfully.")
-            _model_cache[model_choice] = (model, None, None)
-            return _model_cache[model_choice]
-
-        # Handle Llama 3.2 Vision model
-        elif model_choice == 'llama3.2-vision':
-            device = detect_device()
-            model_id = "alpindale/Llama-3.2-11B-Vision-Instruct"
-
-            model = AutoModelForCausalLM.from_pretrained(
-                model_id,
-                torch_dtype=torch.float16 if device != 'cpu' else torch.float32,
-                device_map="auto"
-            )
-            processor = AutoProcessor.from_pretrained(model_id)
-            model.to(device)
-
-            _model_cache[model_choice] = (model, processor, device)
-            logger.info("Llama 3.2 Vision model loaded and cached.")
-            return _model_cache[model_choice]
-
-        else:
-            logger.error(f"Invalid model choice: {model_choice}")
-            raise ValueError("Invalid model choice. Choose 'llama3.2-vision' or 'gemini'.")
-
-    except Exception as e:
-        logger.error(f"Error loading model '{model_choice}': {str(e)}")
+        with open(image_path, "rb") as image_file:
+            return base64.b64encode(image_file.read()).decode('utf-8')
+    except IOError as e:
+        logger.error(f"Image read error: {e}")
         raise
 
-# Example function to handle model inference for Web UI
-def generate_response(model_choice, input_data):
+def generate_response(
+    prompt: str,
+    model_name: str = "llama3.2-vision",
+    image_path: Optional[str] = None,
+    max_tokens: int = 300,
+    temperature: float = 0.7,
+    top_p: float = 0.9,
+    top_k: int = 40,
+    system_prompt: str = "Carefully examine the prompt to identify key information relevant to the question in concise manner."  # Default system prompt
+) -> str:
     """
-    Generate a response from the specified model.
-
+    Generate response with optional image input, system prompt, and performance optimizations.
+    
     Args:
-        model_choice (str): 'llama3.2-vision' or 'gemini'
-        input_data (str): User input or prompt data
-
+        prompt (str): User's query
+        model_name (str): Ollama model name
+        image_path (str, optional): Path to image file
+        max_tokens (int): Maximum tokens to generate
+        temperature (float): Sampling temperature
+        top_p (float): Nucleus sampling parameter
+        top_k (int): Limits number of considered tokens
+        system_prompt (str): Instruction to set the model's behavior
+    
     Returns:
-        str: Generated response
+        str: Model's response
     """
-    model, processor, device = load_model(model_choice)
+    # Start timing
+    start_time = time.time()
 
-    if model_choice == 'gemini':
-        response = model.generate_content(input_data)
-        return response.text
+    # Combine system prompt and user prompt
+    combined_prompt = f"{system_prompt}\n\n{prompt}"
 
-    elif model_choice == 'llama3.2-vision':
-        inputs = processor(text=input_data, return_tensors="pt").to(device)
-        outputs = model.generate(**inputs)
-        response = processor.decode(outputs[0], skip_special_tokens=True)
-        return response
+    # Validate image path if provided
+    if image_path and not os.path.exists(image_path):
+        logger.error(f"Image not found: {image_path}")
+        return "Error: Image file not found."
+ 
 
+    # Prepare payload
+    payload = {
+        "model": model_name,
+        "prompt": combined_prompt,
+        "stream": False,
+        "options": {
+            "num_predict": max_tokens,
+            "temperature": temperature,
+            "top_p": top_p,
+            "top_k": top_k
+        }
+    }
+
+    # Add image if provided
+    if image_path:
+        try:
+            payload["images"] = [encode_image_to_base64(image_path)]
+        except Exception as e:
+            logger.error(f"Image processing error: {e}")
+            return f"Error processing image: {e}"
+
+    # Send request
+    try:
+        response = requests.post(OLLAMA_URL, json=payload)
+        
+        # Log response details for debugging
+        logger.info(f"Full API Response: {json.dumps({
+            'status_code': response.status_code,
+            'model': model_name,
+            'total_time': time.time() - start_time
+        }, indent=2)}")
+        
+        # Check response
+        if response.status_code != 200:
+            logger.error(f"API Error: {response.status_code}")
+            return "API request failed"
+        
+        # Extract response
+        response_data = response.json()
+        
+        # Log performance metrics
+        logger.info(f"Performance Metrics: {json.dumps({
+            'total_duration_ms': response_data.get('total_duration', 0) / 1_000_000,
+            'prompt_eval_count': response_data.get('prompt_eval_count', 0),
+            'eval_count': response_data.get('eval_count', 0)
+        }, indent=2)}")
+        
+        return response_data.get('response', 'No response')
+    
+
+
+    except Exception as e:
+        logger.error(f"Request error: {e}")
+        return f"Error: {e}"
+
+
+
+# Test script
+if __name__ == "__main__":
+    # Text query
+    text_response = generate_response("What is the Machine learning? in short")
+    print(text_response)
+
+    # Image query (replace with your actual image path)
+    image_path = "D:\\Code\\VisiQ-GPT\\data\\Vector.png"
+    if os.path.exists(image_path):
+        image_response = generate_response("Describe this image fast", image_path=image_path)
+        print(image_response)
     else:
-        logger.error(f"Unsupported model for response generation: {model_choice}")
-        raise ValueError("Unsupported model for response generation.")
+        print(f"Image not found at {image_path}")
+
+   
 

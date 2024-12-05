@@ -2,7 +2,7 @@
 
 import os
 from docx2pdf import convert
-from logger import get_logger
+from utils.logger import get_logger
 
 logger = get_logger(__name__)
 

@@ -46,7 +46,7 @@ def get_logger(name):
         logger.addHandler(console_handler)
 
     # Add a separator line for each new execution
-    separator = f"\n{'=' * 50}\n=== New Execution: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ===\n{'=' * 50}\n"
+    separator = f"\n{'=' * 50}\n=== Execution: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ===\n{'=' * 50}\n"
     with open(log_file, "a") as f:
         f.write(separator)
 
