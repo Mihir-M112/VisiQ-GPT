@@ -127,3 +127,23 @@ Security Notes
 MongoDB credentials should be stored securely
 Base64 encoding used for image transfer
 Local cache implements file-based security
+
+
+
+
+
+
+
+-> To do:
+
+(db_manager.py) - Implement MongoDB storage for image and PDF embeddings update to do so.
+
+Now i want to implement the mongodb for the image and pdf processing. I will use the pymongo library to connect to the mongodb and store the image and pdf embeddings in the mongodb. then i will use the mongodb to retrieve the embeddings for the image and pdf processing. Such that the response time will be reduced and the system will be more efficient. 
+
+- Implemnet mongo db such that it consists of user last 5 query whether related to image or pdf so the model have knowledge base of the user query and can provide the better response to the user.
+
+- implement fastapi to create the api for the model such that the user can interact with the model using the api.
+
+- impelment the docker to containerize the model and deploy it on the cloud such that the user can access the model from anywhere.
+
+- implement streamlit to create the web app for the model such that the user can interact with the model using the web app.

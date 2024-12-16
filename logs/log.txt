@@ -338,3 +338,21 @@
 ==================================================
 === Execution: 2024-12-10 14:52:08 ===
 ==================================================
+
+==================================================
+=== Execution: 2024-12-16 20:26:35 ===
+==================================================
+2024-12-16 20:26:43 - __main__ - INFO - Using cached image analysis and embeddings
+2024-12-16 20:26:47 - __main__ - ERROR - Request error: HTTPConnectionPool(host='localhost', port=11434): Max retries exceeded with url: /api/generate (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000020D980A4B30>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))
+
+==================================================
+=== Execution: 2024-12-16 20:27:32 ===
+==================================================
+2024-12-16 20:27:32 - __main__ - INFO - Using cached image analysis and embeddings
+2024-12-16 20:30:10 - __main__ - INFO - Response received in 157.97 seconds.
+
+==================================================
+=== Execution: 2024-12-16 20:30:59 ===
+==================================================
+2024-12-16 20:30:59 - __main__ - INFO - Using cached image analysis and embeddings
+2024-12-16 20:31:37 - __main__ - INFO - Response received in 37.52 seconds.

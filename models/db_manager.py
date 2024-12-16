@@ -15,8 +15,8 @@ class MongoDBManager:
     _connection_string = None
     
     # Update these credentials
-    DEFAULT_USERNAME = "visiq_gpt1"
-    DEFAULT_PASSWORD = "VisiQ_GPT@1"
+    DEFAULT_USERNAME = "XXXXXXXX"
+    DEFAULT_PASSWORD = "XXXXXXXX"
     DEFAULT_CLUSTER = "visiqgpt-db.a9tpc.mongodb.net"
     
     @classmethod

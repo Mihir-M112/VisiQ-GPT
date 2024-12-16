@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+
+crediantials.txt
+
 # C extensions
 *.so
 .byaldi/

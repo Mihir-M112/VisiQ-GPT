@@ -8,7 +8,6 @@ from sentence_transformers import CrossEncoder
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from models.doc_embed import EmbeddingsProcessor 
 from models.image_embed import ImageEmbeddingProcessor
-
 import hashlib
 import io
 from pathlib import Path
@@ -21,23 +20,6 @@ logger = get_logger(__name__)
 OLLAMA_URL = "http://localhost:11434/api/generate"
 IMAGE_CACHE_DIR = Path("./image_cache")
 IMAGE_CACHE_DIR.mkdir(exist_ok=True)
-
-OLLAMA_TIMEOUT = 60  # Increased timeout
-MAX_RETRIES = 3
-BACKOFF_FACTOR = 0.5
-
-def create_http_session():
-    """Create a requests session with retry strategy"""
-    session = requests.Session()
-    retry_strategy = Retry(
-        total=MAX_RETRIES,
-        backoff_factor=BACKOFF_FACTOR,
-        status_forcelist=[408, 429, 500, 502, 503, 504]
-    )
-    adapter = HTTPAdapter(max_retries=retry_strategy)
-    session.mount("http://", adapter)
-    session.mount("https://", adapter)
-    return session
 
 def process_pdf(pdf_path: str) -> str:
     """Extract text from a PDF using embeddings processor."""
@@ -71,115 +53,132 @@ def generate_response(
     top_p: float = 0.9,
     top_k: int = 40,
     detailed_response: bool = True,
-    system_prompt: str = "Carefully read the user prompt and provide a detailed response:",
-    session_id: Optional[str] = None
+    system_prompt: str = "Carefully read the user prompt and provide a detailed response:"
 ) -> str:
     """Generate a response from the model using optional image or PDF input."""
     try:
         start_time = time.time()
-        logger.info("Starting response generation...")
         
-        # Initialize MongoDB manager for session tracking
-        db_manager = MongoDBManager()
+        # Process PDF if provided
+        if pdf_path:
+            pdf_content = process_pdf(pdf_path)
+            if pdf_content:
+                processor = EmbeddingsProcessor()
+                relevant_text, is_relevant = processor.query_similar_content("", prompt)  # Empty query string as we're using prompt for search
+                
+                if not is_relevant:
+                    return "I cannot find relevant information about this query in the provided document."
+                
+                detail_instruction = "Provide a comprehensive and detailed explanation with examples if available." if detailed_response else "Provide a brief and concise answer."
+                combined_prompt = f"""System: Answer based on the following context. {detail_instruction}
+                If the question cannot be answered from this context, say so.
+                
+                Context: {relevant_text}
+                
+                Question: {prompt}
+                
+                Remember to {'provide detailed explanations and examples' if detailed_response else 'keep the response concise'}."""
+            else:
+                logger.warning("No content extracted from the PDF.")
+                return "Failed to extract content from the PDF."
+        else:
+            detail_instruction = "provide comprehensive and detailed explanations" if detailed_response else "be brief and concise"
+            combined_prompt = f"System: Please {detail_instruction} in your response.\n\n{prompt}"
         
-        # Create new session if none exists
-        if not session_id:
-            session_id = db_manager.create_session()
-            
-        # Get last used file from session if no new file provided
-        if not image_path and not pdf_path:
-            session_file = db_manager.get_session_file(session_id)
-            if session_file:
-                if session_file['file_type'] == 'image':
-                    image_path = session_file['file_path']
-                elif session_file['file_type'] == 'pdf':
-                    pdf_path = session_file['file_path']
-
-        # Initialize payload with common settings
+        # Prepare payload
         payload = {
             "model": model_name,
+            "prompt": combined_prompt,
             "stream": False,
             "options": {
                 "num_predict": max_tokens,
                 "temperature": temperature,
                 "top_p": top_p,
-                "top_k": top_k,
-                "num_ctx": 2048
+                "top_k": top_k
             }
         }
 
-        response_text = ""
-        
-        if image_path or pdf_path:
-            # Update session with current file
-            if image_path:
-                db_manager.update_session_file(session_id, image_path, 'image')
-            elif pdf_path:
-                db_manager.update_session_file(session_id, pdf_path, 'pdf')
+        # Add image processing with vision model and embeddings
+        if image_path:
+            processor = ImageEmbeddingProcessor()
+            image_data = processor.process_image(image_path)
+            if image_data:
+                logger.info("Using cached image analysis and embeddings")
+                enhanced_prompt = f"""System: I have analyzed this image in detail. Here's the comprehensive analysis:
 
-            # Process file-based query
-            if pdf_path:
-                processor = EmbeddingsProcessor(use_mongodb=True)
-                relevant_text, is_relevant = processor.query_similar_content("", prompt)
+{image_data['vision_analysis']}
+
+Based on this detailed analysis, please address the following user query:
+"{prompt}"
+
+Consider all relevant aspects from the analysis when forming your response. If the query asks about specific details, refer to the appropriate sections of the analysis."""
+
+                payload = {
+                    "model": model_name,
+                    "prompt": enhanced_prompt,
+                    "images": [image_data['base64_image']],
+                    "stream": False,
+                    "options": {
+                        "num_predict": max_tokens,
+                        "temperature": temperature,
+                        "top_p": top_p,
+                        "top_k": top_k
+                    }
+                }
                 
-                if not is_relevant:
-                    response_text = "I cannot find relevant information about this query in the provided document. Would you like me to answer this question generally?"
-                else:
-                    payload["prompt"] = f"""System: Answer based on the following context.
-                    Context: {relevant_text}
-                    Question: {prompt}"""
-            # ... existing image processing code ...
+                if image_data.get('embeddings'):
+                    payload["embeddings"] = image_data['embeddings']
+            else:
+                # Fallback to basic image processing
+                payload["images"] = [encode_image_to_base64(image_path)]
 
-        else:
-            # Handle general query
-            payload["prompt"] = f"System: {system_prompt}\n\n{prompt}"
+        # Send request to Ollama server
+        response = requests.post(OLLAMA_URL, json=payload)
+        response_time = time.time() - start_time
 
-        if not response_text:  # If no response set yet, call the API
-            with create_http_session() as session:
-                response = session.post(OLLAMA_URL, json=payload)
-                response_data = response.json()
-                response_text = response_data.get('response', 'No response content.')
+        if response.status_code != 200:
+            logger.error(f"API Error: {response.status_code} - {response.text}")
+            return "API request failed."
 
-        # Store conversation history
-        db_manager.add_conversation_history(session_id, prompt, response_text)
-        
-        return response_text
+        logger.info(f"Response received in {response_time:.2f} seconds.")
+        response_data = response.json()
+        return response_data.get('response', 'No response content.')
 
+    except requests.RequestException as e:
+        logger.error(f"Request error: {e}")
+        return f"Request failed: {e}"
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
-        return {
-            'response': f"An error occurred: {str(e)}",
-            'session_id': session_id
-        }
+        return f"An error occurred: {e}"
 
 
 # Test script
 if __name__ == "__main__":
-    # Text query test
-    print("=========================================================================")
-    print("------------------------------Text Processing----------------------------")          
-    print("=========================================================================")
+    # # Text query test
+    # print("=========================================================================")
+    # print("------------------------------Text Processing----------------------------")          
+    # print("=========================================================================")
     
-    try:
-        text_response = generate_response("What is machine learning?")
-        print("Text Response:", text_response)
-    except Exception as e:
-        logger.error(f"Text query test failed: {e}")
+    # try:
+    #     text_response = generate_response("What is machine learning?")
+    #     print("Text Response:", text_response)
+    # except Exception as e:
+    #     logger.error(f"Text query test failed: {e}")
 
-    # print("=========================================================================")
-    # print("----------------------------Image Processing-----------------------------")          
-    # print("=========================================================================")
+    print("=========================================================================")
+    print("----------------------------Image Processing-----------------------------")          
+    print("=========================================================================")
 
-    # # Image query test
-    # image_path = "D:\\Code\\VisiQ-GPT\\data\\phone.png"
-    # if os.path.exists(image_path):
-    #     try:
-    #         image_response = generate_response("Can you tell me what the battery left?", image_path=image_path)
-    #         print("Image Response:", image_response)
-    #     except Exception as e:
-    #         logger.error(f"Image query test failed: {e}")
-    # else:
-    #     logger.warning(f"Image not found at {image_path}")
+    # Image query test
+    image_path = "D:\\Code\\VisiQ-GPT\\data\\phone.png"
+    if os.path.exists(image_path):
+        try:
+            image_response = generate_response("Describe the image", image_path=image_path)
+            print("Image Response:", image_response)
+        except Exception as e:
+            logger.error(f"Image query test failed: {e}")
+    else:
+        logger.warning(f"Image not found at {image_path}")
 
     # print("=========================================================================")
     # print("------------------------------PDF Processing-----------------------------")          
@@ -199,12 +198,13 @@ if __name__ == "__main__":
             
     #         # Test with concise response
     #         pdf_response = generate_response(
-    #             "what is the summary of the document?",
+    #             "can you tell me page number of table 1?",
     #             pdf_path=pdf_path,
-    #             detailed_response=True
+    #             detailed_response=False
     #         )
     #         print("Concise PDF Response:", pdf_response)
     #     except Exception as e:
     #         logger.error(f"PDF query test failed: {e}")
     # else:
     #     logger.warning(f"PDF not found at {pdf_path}")
+    
