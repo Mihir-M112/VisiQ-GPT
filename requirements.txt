@@ -3,8 +3,8 @@ uvicorn
 streamlit
 doc2pdf
 pymongo
+python-multipart
 transformers
-pypdf2
 chromadb            # Vector store
 pillow              # Image processing
 pypdf2              # PDF handling

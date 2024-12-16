@@ -1,34 +1,340 @@
 
 ==================================================
-=== Execution: 2024-12-06 11:37:26 ===
+=== Execution: 2024-12-09 21:37:39 ===
+==================================================
+2024-12-09 21:41:30 - models.model_loader - INFO - Response received in 19.09 seconds.
+2024-12-09 21:44:40 - models.model_loader - INFO - Response received in 150.11 seconds.
+2024-12-09 21:46:04 - models.model_loader - INFO - Response received in 18.43 seconds.
+2024-12-09 21:47:49 - models.model_loader - INFO - Response received in 88.07 seconds.
+2024-12-09 21:53:49 - models.model_loader - INFO - Using image analysis and embeddings
+2024-12-09 21:54:26 - models.model_loader - INFO - Response received in 264.79 seconds.
+2024-12-09 22:14:29 - models.model_loader - INFO - Using image analysis and embeddings
+2024-12-09 22:16:08 - models.model_loader - INFO - Response received in 590.29 seconds.
+2024-12-09 22:27:47 - models.model_loader - INFO - Using image analysis and embeddings
+2024-12-09 22:28:14 - models.model_loader - INFO - Response received in 419.06 seconds.
+2024-12-09 22:38:18 - models.model_loader - INFO - Using image analysis and embeddings
+2024-12-09 22:38:31 - models.model_loader - INFO - Response received in 315.87 seconds.
+2024-12-09 22:49:46 - models.model_loader - INFO - Using image analysis and embeddings
+2024-12-09 22:50:07 - models.model_loader - INFO - Response received in 358.10 seconds.
+2024-12-09 22:55:25 - models.model_loader - INFO - Using image analysis and embeddings
+2024-12-09 22:55:34 - models.model_loader - INFO - Response received in 75.71 seconds.
+2024-12-09 22:58:33 - models.model_loader - INFO - Using image analysis and embeddings
+2024-12-09 22:58:56 - models.model_loader - INFO - Response received in 171.91 seconds.
+2024-12-09 23:09:20 - models.model_loader - INFO - Response received in 130.34 seconds.
+2024-12-09 23:39:32 - models.model_loader - INFO - Response received in 9.15 seconds.
+
+==================================================
+=== Execution: 2024-12-10 11:40:05 ===
 ==================================================
 
 ==================================================
-=== Execution: 2024-12-06 16:44:22 ===
+=== Execution: 2024-12-10 11:40:05 ===
 ==================================================
-2024-12-06 16:45:03 - __main__ - INFO - Response received in 41.20 seconds.
-2024-12-06 16:45:03 - __main__ - INFO - Image added to the payload.
-2024-12-06 16:49:52 - __main__ - INFO - Response received in 288.36 seconds.
 
 ==================================================
-=== Execution: 2024-12-06 16:52:34 ===
+=== Execution: 2024-12-10 11:40:05 ===
 ==================================================
-2024-12-06 16:52:35 - __main__ - INFO - PDF content appended to the prompt.
-2024-12-06 16:55:20 - __main__ - INFO - Response received in 165.61 seconds.
 
 ==================================================
-=== Execution: 2024-12-06 16:56:32 ===
+=== Execution: 2024-12-10 11:40:33 ===
 ==================================================
-2024-12-06 16:56:32 - __main__ - INFO - PDF content appended to the prompt.
-2024-12-06 16:59:37 - __main__ - INFO - Response received in 184.89 seconds.
 
 ==================================================
-=== Execution: 2024-12-06 17:04:59 ===
+=== Execution: 2024-12-10 11:40:33 ===
 ==================================================
-2024-12-06 17:05:37 - __main__ - INFO - Response received in 37.29 seconds.
 
 ==================================================
-=== Execution: 2024-12-06 17:07:09 ===
+=== Execution: 2024-12-10 11:40:33 ===
 ==================================================
-2024-12-06 17:07:45 - __main__ - INFO - Response received in 35.63 seconds.
-2024-12-06 17:07:45 - __main__ - ERROR - Request error: Extra data: line 2 column 1 (char 106)
+
+==================================================
+=== Execution: 2024-12-10 11:40:33 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 12:01:29 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 12:01:29 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 12:01:29 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 12:01:29 ===
+==================================================
+2024-12-10 12:01:29 - models.db_manager - INFO - Attempting to connect to MongoDB...
+2024-12-10 12:01:32 - models.db_manager - INFO - Successfully connected to MongoDB and created indexes
+
+==================================================
+=== Execution: 2024-12-10 12:04:24 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 12:04:24 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 12:04:24 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 12:04:24 ===
+==================================================
+2024-12-10 12:04:24 - models.db_manager - INFO - Attempting to connect to MongoDB...
+2024-12-10 12:04:25 - models.db_manager - INFO - Successfully connected to MongoDB and created indexes
+2024-12-10 12:09:32 - models.model_loader - INFO - Starting response generation...
+2024-12-10 12:09:55 - models.model_loader - INFO - Response received in 23.42 seconds.
+2024-12-10 12:10:41 - models.model_loader - INFO - Starting response generation...
+2024-12-10 12:10:41 - models.model_loader - INFO - Initializing MongoDB connection...
+2024-12-10 12:10:41 - models.image_embed - INFO - Initializing MongoDB connection...
+2024-12-10 12:10:41 - models.image_embed - INFO - MongoDB connected successfully
+2024-12-10 12:10:41 - models.model_loader - INFO - MongoDB connected successfully
+2024-12-10 12:10:41 - models.model_loader - INFO - Processing image...
+2024-12-10 12:10:41 - models.image_embed - INFO - Checking MongoDB cache...
+2024-12-10 12:10:42 - models.image_embed - INFO - No cache found in MongoDB
+2024-12-10 12:11:14 - models.image_embed - ERROR - Error analyzing image: HTTPConnectionPool(host='localhost', port=11434): Read timed out. (read timeout=30)
+
+==================================================
+=== Execution: 2024-12-10 12:30:44 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 12:30:44 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 12:30:44 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 12:30:44 ===
+==================================================
+2024-12-10 12:30:44 - models.db_manager - INFO - Attempting to connect to MongoDB...
+2024-12-10 12:30:45 - models.db_manager - INFO - Successfully connected to MongoDB and created indexes
+
+==================================================
+=== Execution: 2024-12-10 12:40:50 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 12:40:50 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 12:40:50 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 12:40:50 ===
+==================================================
+2024-12-10 12:40:50 - models.db_manager - INFO - Attempting to connect to MongoDB...
+2024-12-10 12:40:51 - models.db_manager - INFO - Successfully connected to MongoDB and created indexes
+
+==================================================
+=== Execution: 2024-12-10 12:41:07 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 12:41:07 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 12:41:07 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 12:41:07 ===
+==================================================
+2024-12-10 12:41:07 - models.db_manager - INFO - Attempting to connect to MongoDB...
+2024-12-10 12:41:09 - models.db_manager - INFO - Successfully connected to MongoDB and created indexes
+2024-12-10 12:45:42 - models.model_loader - INFO - Starting response generation...
+2024-12-10 12:45:42 - models.model_loader - INFO - Initializing MongoDB connection...
+2024-12-10 12:45:42 - models.image_embed - INFO - Initializing MongoDB connection...
+2024-12-10 12:45:42 - models.image_embed - INFO - MongoDB connected successfully
+2024-12-10 12:45:42 - models.model_loader - INFO - MongoDB connected successfully
+2024-12-10 12:45:42 - models.model_loader - INFO - Processing image...
+2024-12-10 12:45:42 - models.image_embed - INFO - Checking MongoDB cache...
+2024-12-10 12:45:42 - models.image_embed - INFO - No cache found in MongoDB
+2024-12-10 12:46:44 - models.image_embed - ERROR - Image analysis timed out
+
+==================================================
+=== Execution: 2024-12-10 12:48:07 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 12:48:44 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 12:48:44 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 12:48:44 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 12:48:44 ===
+==================================================
+2024-12-10 12:48:44 - models.db_manager - INFO - Attempting to connect to MongoDB...
+2024-12-10 12:48:44 - models.db_manager - INFO - Successfully connected to MongoDB and created indexes
+
+==================================================
+=== Execution: 2024-12-10 12:49:03 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 12:49:03 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 12:49:03 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 12:49:03 ===
+==================================================
+2024-12-10 12:49:03 - models.db_manager - INFO - Attempting to connect to MongoDB...
+2024-12-10 12:49:04 - models.db_manager - INFO - Successfully connected to MongoDB and created indexes
+2024-12-10 12:49:23 - models.model_loader - INFO - Starting response generation...
+2024-12-10 12:49:23 - models.model_loader - INFO - Initializing MongoDB connection...
+2024-12-10 12:49:23 - models.image_embed - INFO - Initializing MongoDB connection...
+2024-12-10 12:49:23 - models.image_embed - INFO - MongoDB connected successfully
+2024-12-10 12:49:23 - models.model_loader - INFO - MongoDB connected successfully
+2024-12-10 12:49:23 - models.model_loader - INFO - Processing image...
+2024-12-10 12:49:24 - models.image_embed - INFO - Checking MongoDB cache...
+2024-12-10 12:49:24 - models.image_embed - INFO - Using cached data from MongoDB
+2024-12-10 12:49:36 - models.model_loader - INFO - Starting response generation...
+2024-12-10 12:49:36 - models.model_loader - INFO - Initializing MongoDB connection...
+2024-12-10 12:49:36 - models.image_embed - INFO - Initializing MongoDB connection...
+2024-12-10 12:49:36 - models.image_embed - INFO - MongoDB connected successfully
+2024-12-10 12:49:36 - models.model_loader - INFO - MongoDB connected successfully
+2024-12-10 12:49:36 - models.model_loader - INFO - Processing image...
+2024-12-10 12:49:36 - models.image_embed - INFO - Checking MongoDB cache...
+2024-12-10 12:49:36 - models.image_embed - INFO - Using cached data from MongoDB
+
+==================================================
+=== Execution: 2024-12-10 12:51:12 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 12:51:12 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 12:51:12 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 12:51:12 ===
+==================================================
+2024-12-10 12:51:12 - models.db_manager - INFO - Attempting to connect to MongoDB...
+2024-12-10 12:51:13 - models.db_manager - INFO - Successfully connected to MongoDB and created indexes
+
+==================================================
+=== Execution: 2024-12-10 13:01:07 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 13:01:07 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 13:01:07 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 13:01:07 ===
+==================================================
+2024-12-10 13:01:07 - models.db_manager - INFO - Attempting to connect to MongoDB...
+2024-12-10 13:01:09 - models.db_manager - INFO - Successfully connected to MongoDB and created indexes
+
+==================================================
+=== Execution: 2024-12-10 13:02:15 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 13:02:15 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 13:02:15 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 13:02:15 ===
+==================================================
+2024-12-10 13:02:15 - models.db_manager - INFO - Attempting to connect to MongoDB...
+2024-12-10 13:02:17 - models.db_manager - INFO - Successfully connected to MongoDB and created indexes
+
+==================================================
+=== Execution: 2024-12-10 13:02:26 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 13:02:26 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 13:02:26 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 13:02:26 ===
+==================================================
+2024-12-10 13:02:26 - models.db_manager - INFO - Attempting to connect to MongoDB...
+2024-12-10 13:02:26 - models.db_manager - INFO - Successfully connected to MongoDB and created indexes
+2024-12-10 13:04:34 - models.model_loader - INFO - Starting response generation...
+2024-12-10 13:04:34 - models.model_loader - ERROR - Unexpected error: name 'Retry' is not defined
+
+==================================================
+=== Execution: 2024-12-10 13:07:30 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 13:07:30 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 13:07:30 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 13:07:30 ===
+==================================================
+2024-12-10 13:07:30 - models.db_manager - INFO - Attempting to connect to MongoDB...
+2024-12-10 13:07:31 - models.db_manager - INFO - Successfully connected to MongoDB and created indexes
+
+==================================================
+=== Execution: 2024-12-10 13:14:28 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 13:14:28 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 13:14:28 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 13:14:28 ===
+==================================================
+2024-12-10 13:14:28 - models.db_manager - INFO - Attempting to connect to MongoDB...
+2024-12-10 13:14:30 - models.db_manager - INFO - Successfully connected to MongoDB and created indexes
+
+==================================================
+=== Execution: 2024-12-10 14:52:08 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 14:52:08 ===
+==================================================
+
+==================================================
+=== Execution: 2024-12-10 14:52:08 ===
+==================================================

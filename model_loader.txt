@@ -1,477 +1,94 @@
-import sys
-import os
-import requests
-import json
-import base64
-from typing import Optional
-import time
-
-# Add the root directory to the sys.path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from logger import get_logger
-
-logger = get_logger(__name__)
-
-OLLAMA_URL = "http://localhost:11434/api/generate"
-
-def encode_image_to_base64(image_path: str) -> str:
-    """Convert image to base64 encoded string."""
-    try:
-        with open(image_path, "rb") as image_file:
-            return base64.b64encode(image_file.read()).decode('utf-8')
-    except IOError as e:
-        logger.error(f"Image read error: {e}")
-        raise
-
-def generate_response(
-    prompt: str,
-    model_name: str = "llama3.2-vision",
-    image_path: Optional[str] = None,
-    max_tokens: int = 300,
-    temperature: float = 0.7,
-    top_p: float = 0.9,
-    top_k: int = 40,
-    system_prompt: str = "Give answer in short"  # Default system prompt
-) -> str:
-    """
-    Generate response with optional image input, system prompt, and performance optimizations.
-    
-    Args:
-        prompt (str): User's query
-        model_name (str): Ollama model name
-        image_path (str, optional): Path to image file
-        max_tokens (int): Maximum tokens to generate
-        temperature (float): Sampling temperature
-        top_p (float): Nucleus sampling parameter
-        top_k (int): Limits number of considered tokens
-        system_prompt (str): Instruction to set the model's behavior
-    
-    Returns:
-        str: Model's response
-    """
-    # Start timing
-    start_time = time.time()
-
-    # Combine system prompt and user prompt
-    combined_prompt = f"{system_prompt}\n\n{prompt}"
-
-    # Validate image path if provided
-    if image_path and not os.path.exists(image_path):
-        logger.error(f"Image not found: {image_path}")
-        return "Error: Image file not found."
-
-    # Prepare payload
-    payload = {
-        "model": model_name,
-        "prompt": combined_prompt,
-        "stream": False,
-        "options": {
-            "num_predict": max_tokens,
-            "temperature": temperature,
-            "top_p": top_p,
-            "top_k": top_k
-        }
-    }
-
-    # Add image if provided
-    if image_path:
-        try:
-            payload["images"] = [encode_image_to_base64(image_path)]
-        except Exception as e:
-            logger.error(f"Image processing error: {e}")
-            return f"Error processing image: {e}"
-
-    # Send request
-    try:
-        response = requests.post(OLLAMA_URL, json=payload)
-        
-        # Log response details for debugging
-        logger.info(f"Full API Response: {json.dumps({
-            'status_code': response.status_code,
-            'model': model_name,
-            'total_time': time.time() - start_time
-        }, indent=2)}")
-        
-        # Check response
-        if response.status_code != 200:
-            logger.error(f"API Error: {response.status_code}")
-            return "API request failed"
-        
-        # Extract response
-        response_data = response.json()
-        
-        # Log performance metrics
-        logger.info(f"Performance Metrics: {json.dumps({
-            'total_duration_ms': response_data.get('total_duration', 0) / 1_000_000,
-            'prompt_eval_count': response_data.get('prompt_eval_count', 0),
-            'eval_count': response_data.get('eval_count', 0)
-        }, indent=2)}")
-        
-        return response_data.get('response', 'No response')
-    
-    except Exception as e:
-        logger.error(f"Request error: {e}")
-        return f"Error: {e}"
-
-
-
-# Test script
-if __name__ == "__main__":
-    # Text query
-    text_response = generate_response("What is the Machine learning? in short")
-    print(text_response)
-
-    # Image query (replace with your actual image path)
-    image_path = "D:\\Code\\VisiQ-GPT\\Vector.png"
-    if os.path.exists(image_path):
-        image_response = generate_response("Describe this image fast", image_path=image_path)
-        print(image_response)
-    else:
-        print(f"Image not found at {image_path}")
-
-
-
-# -------------------------------------------------------------------------------------------------
-
-
-# main.py
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
-from pydantic import BaseModel
-from typing import Optional
-from fastapi.responses import JSONResponse
-from models.model_loader import generate_response
-import shutil
-import os
-
-app = FastAPI()
-
-# Endpoint for text-based query
-@app.post("/generate-text/")
-async def generate_text(
-    prompt: str = Form(...),
-    model_name: str = Form("llama3.2-vision"),
-    max_tokens: int = Form(300),
-    temperature: float = Form(0.7),
-    top_p: float = Form(0.9),
-    top_k: int = Form(40),
-    system_prompt: str = Form("Give answer in short.")  # Default value
-):
-    try:
-        response = generate_response(prompt, model_name, None, max_tokens, temperature, top_p, top_k, system_prompt)
-        return {"response": response}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-
-# Endpoint for image-based query
-@app.post("/generate-image/")
-async def generate_image(prompt: str = Form(...), file: UploadFile = File(...), model_name: str = Form("llama3.2-vision")):
-    # Save the uploaded image temporarily
-    temp_file_path = f"temp_{file.filename}"
-    try:
-        with open(temp_file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-        
-        # Call model with image
-        response = generate_response(prompt, model_name, image_path=temp_file_path)
-        
-        return {"response": response}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        # Clean up the temporary file
-        if os.path.exists(temp_file_path):
-            os.remove(temp_file_path)
-
-
-UPLOAD_FOLDER = "uploads"  # Folder to save uploaded files
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
-@app.post("/upload/")
-async def upload_document(file: UploadFile = File(...), query: str = Form(...), system_prompt: str = Form("You are a helpful AI assistant.")):
-    """
-    Upload a Word or PDF document, process it, and generate a response.
-    
-    Args:
-        file (UploadFile): The uploaded document (Word or PDF).
-        query (str): The user's question about the document.
-        system_prompt (str): Optional system prompt to customize behavior.
-    
-    Returns:
-        JSONResponse: The model's generated response.
-    """
-    # Save the uploaded file
-    file_path = os.path.join(UPLOAD_FOLDER, file.filename)
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-
-    # Generate response using the uploaded document
-    try:
-        response = generate_response(prompt=query, doc_path=file_path, system_prompt=system_prompt)
-        return JSONResponse(content={"response": response})
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-@app.get("/health/")
-def health_check():
-    """
-    Health check endpoint to ensure the API is running.
-    """
-    return {"status": "running"}
-
-
-# Root endpoint for quick check
-@app.get("/")
-def read_root():
-    return {"message": "Welcome to the Model API!"}
-
-
-
-
-
-
-
-#--------------------------------------------------------------------------------------------
-system_prompt: 
-"""
-You are an AI assistant tasked with delivering detailed responses strictly based on the provided context. Your objective is to analyze the given information and craft a comprehensive, well-structured answer to the user's question.
-
-Input Format:  
-- The context will be presented as: "Context:"  
-- The user’s question will be presented as: "Question:"  
-
-Guidelines for Formulating Your Response:  
-1. Analyze Thoroughly: Carefully examine the context to identify key information relevant to the question.  
-2. Organize Logically: Plan your response to ensure a coherent and logical flow of ideas.  
-3. Address Directly: Formulate a detailed answer that directly addresses the user's question, using only information from the context.  
-4. Ensure Comprehensiveness: Cover all relevant aspects mentioned in the context to provide a complete answer.  
-5. Handle Insufficient Information: If the context lacks sufficient details to answer the question fully, explicitly state this in your response.  
-
-Formatting Requirements:  
-- Use clear and concise language.  
-- Structure your response into paragraphs for readability.  
-- Utilize bullet points or numbered lists to simplify complex information.  
-- Include headings or subheadings when necessary to enhance structure.  
-- Maintain proper grammar, punctuation, and spelling throughout.  
-
-Important Reminder:  
-Your response must be based solely on the information provided in the context. Do not incorporate any external knowledge or make assumptions beyond what is explicitly stated.
-"""
-
-
-
-
-#-------------------------------------------------------------------------------------------------------------------------------
-
-
-
-
-
-
-import sys
-import os
-import requests
-import json
-import base64
-from typing import Optional
-import time
-import PyPDF2  # For PDF processing
-
-# Add the root directory to the sys.path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from logger import get_logger
-
-logger = get_logger(__name__)
-
-OLLAMA_URL = "http://localhost:11434/api/generate"
-
-def encode_image_to_base64(image_path: str) -> str:
-    """Convert image to base64 encoded string."""
-    try:
-        with open(image_path, "rb") as image_file:
-            return base64.b64encode(image_file.read()).decode('utf-8')
-    except IOError as e:
-        logger.error(f"Image read error: {e}")
-        raise
-
-def generate_response(
-    prompt: str,
-    model_name: str = "llama3.2-vision",
-    image_path: Optional[str] = None,
-    max_tokens: int = 300,
-    temperature: float = 0.7,
-    top_p: float = 0.9,
-    top_k: int = 40,
-    system_prompt: str = "Give answer in short"
-) -> str:
-    """Generate response with optional image input."""
-    start_time = time.time()
-    combined_prompt = f"{system_prompt}\n\n{prompt}"
-
-    if image_path and not os.path.exists(image_path):
-        logger.error(f"Image not found: {image_path}")
-        return "Error: Image file not found."
-
-    payload = {
-        "model": model_name,
-        "prompt": combined_prompt,
-        "stream": False,
-        "options": {
-            "num_predict": max_tokens,
-            "temperature": temperature,
-            "top_p": top_p,
-            "top_k": top_k
-        }
-    }
-
-    if image_path:
-        try:
-            payload["images"] = [encode_image_to_base64(image_path)]
-        except Exception as e:
-            logger.error(f"Image processing error: {e}")
-            return f"Error processing image: {e}"
-
-    try:
-        response = requests.post(OLLAMA_URL, json=payload)
-        logger.info(f"API Response: {response.status_code} in {time.time() - start_time:.2f}s")
-        if response.status_code != 200:
-            logger.error(f"API Error: {response.status_code}")
-            return "API request failed"
-
-        response_data = response.json()
-        return response_data.get('response', 'No response')
-    
-    except Exception as e:
-        logger.error(f"Request error: {e}")
-        return f"Error: {e}"
-
-# New functionality for document uploads
-def extract_text_from_pdf(pdf_path: str) -> str:
-    """Extract text from a PDF file."""
-    try:
-        with open(pdf_path, 'rb') as file:
-            reader = PyPDF2.PdfReader(file)
-            text = ''.join(page.extract_text() or '' for page in reader.pages)
-        return text.strip()
-    except Exception as e:
-        logger.error(f"Error extracting text from PDF: {e}")
-        raise
-
-def handle_document_query(doc_path: str, query: str) -> str:
-    """Process a document and answer a query based on its content."""
-    try:
-        if doc_path.lower().endswith('.pdf'):
-            document_text = extract_text_from_pdf(doc_path)
-        else:
-            return "Unsupported file format."
-
-        combined_query = f"Document content:\n{document_text}\n\nUser query: {query}"
-        return generate_response(combined_query)
-    
-    except Exception as e:
-        logger.error(f"Document query error: {e}")
-        return f"Error processing document: {e}"
-
-# Test script
-if __name__ == "__main__":
-    # Existing functionality tests
-    # text_response = generate_response("What is Machine Learning?")
-    # print(text_response)
-
-    # image_path = "D:\\Code\\VisiQ-GPT\\Vector.png"
-    # if os.path.exists(image_path):
-    #     image_response = generate_response("Describe this image.", image_path=image_path)
-    #     print(image_response)
-    
-    # New document upload feature test
-    doc_path = "D:\\Code\\VisiQ-GPT\\Vector Database.pdf"
-    query = "Summarize the key points."
-    if os.path.exists(doc_path):
-        doc_response = handle_document_query(doc_path, query)
-        print(doc_response)
-    else:
-        print(f"Document not found at {doc_path}")
-
-
-
-
-
-
-
-#-------------------------------------------------------------------------------------------
-
 # models/model_loader.py
+
+import sys
 import os
+import time
 import requests
 import base64
-import time
-import PyPDF2  # For PDF processing
 from typing import Optional
-# Add the root directory to the sys.path
-import os 
-import sys
+from sentence_transformers import CrossEncoder  
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from utils.logger import get_logger
+from models.embeddings import EmbeddingsProcessor 
+from models.image_embed import ImageEmbeddingProcessor
+import hashlib
+from PIL import Image
+import io
+from pathlib import Path
 
+# Add the root directory to the sys.path
+from utils.logger import get_logger
+# Logger setup
 logger = get_logger(__name__)
 
+OLLAMA_URL = "http://localhost:11434/api/generate"
+IMAGE_CACHE_DIR = Path("./image_cache")
+IMAGE_CACHE_DIR.mkdir(exist_ok=True)
 
+def process_pdf(pdf_path: str) -> str:
+    """Extract text from a PDF using embeddings processor."""
+    try:
+        processor = EmbeddingsProcessor()
+        text_content, _ = processor.process_pdf(pdf_path)
+        return text_content
+    except Exception as e:
+        logger.error(f"Error processing PDF with embeddings: {str(e)}")
+        return ""
 
-from models.doc_embeddings import DocumentEmbedder
-from models.image_embeddings import ImageEmbedder
-class ModelLoader:
-    def __init__(self, ollama_url: str = "http://localhost:11434/api/generate"):
-        self.ollama_url = ollama_url
-        self.document_embedder = DocumentEmbedder()
-        self.image_embedder = ImageEmbedder()
+def encode_image_to_base64(image_path: str) -> str:
+    """Get processed and cached image data."""
+    try:
+        processor = ImageEmbeddingProcessor()
+        result = processor.process_image(image_path)
+        if result and result.get('base64_image'):
+            return result['base64_image']
+        raise IOError("Failed to process image")
+    except IOError as e:
+        logger.error(f"Image read error: {e}")
+        raise
 
-    def add_document(self, file_path: str, file_name: str):
-        return self.document_embedder.add_to_collection(file_path, file_name)
-
-    def add_image(self, image_path: str, image_name: str):
-        return self.image_embedder.add_to_collection(image_path, image_name)
-
-    def query_document(self, query: str):
-        return self.document_embedder.query_collection(query)
-
-    def query_image(self, query: str):
-        return self.image_embedder.query_collection(query)
-
-    @staticmethod
-    def encode_image_to_base64(image_path: str) -> str:
-        """Convert image to base64 encoded string."""
-        try:
-            with open(image_path, "rb") as image_file:
-                return base64.b64encode(image_file.read()).decode('utf-8')
-        except IOError as e:
-            logger.error(f"Image read error: {e}")
-            raise
-
-    def generate_response(
-        self,
-        prompt: str,
-        model_name: str = "llama3.2-vision",
-        image_path: Optional[str] = None,
-        max_tokens: int = 300,
-        temperature: float = 0.7,
-        top_p: float = 0.9,
-        top_k: int = 40,
-        system_prompt: str = 
-        """
-        Give Response to the following prompt: 
-- Use clear and concise language.  
-- Structure your response into paragraphs for readability.  
-- Utilize bullet points or numbered lists to simplify complex information.  
-- Include headings or subheadings when necessary to enhance structure.  
-- Maintain proper grammar, punctuation, and spelling throughout. 
-- Provide a detailed and informative response that addresses the query effectively and accurately and also short and concise. 
-"""
-    ) -> str:
-        """Generate response with optional image input."""
+def generate_response(
+    prompt: str,
+    model_name: str = "llama3.2-vision",
+    image_path: Optional[str] = None,
+    pdf_path: Optional[str] = None,
+    max_tokens: int = 800,  # Increased max_tokens for detailed responses
+    temperature: float = 0.7,
+    top_p: float = 0.9,
+    top_k: int = 40,
+    detailed_response: bool = True,
+    system_prompt: str = "Carefully read the user prompt and provide a detailed response:"
+) -> str:
+    """Generate a response from the model using optional image or PDF input."""
+    try:
         start_time = time.time()
-        combined_prompt = f"{system_prompt}\n\n{prompt}"
-
+        
+        # Process PDF if provided
+        if pdf_path:
+            pdf_content = process_pdf(pdf_path)
+            if pdf_content:
+                processor = EmbeddingsProcessor()
+                relevant_text, is_relevant = processor.query_similar_content("", prompt)  # Empty query string as we're using prompt for search
+                
+                if not is_relevant:
+                    return "I cannot find relevant information about this query in the provided document."
+                
+                detail_instruction = "Provide a comprehensive and detailed explanation with examples if available." if detailed_response else "Provide a brief and concise answer."
+                combined_prompt = f"""System: Answer based on the following context. {detail_instruction}
+                If the question cannot be answered from this context, say so.
+                
+                Context: {relevant_text}
+                
+                Question: {prompt}
+                
+                Remember to {'provide detailed explanations and examples' if detailed_response else 'keep the response concise'}."""
+            else:
+                logger.warning("No content extracted from the PDF.")
+                return "Failed to extract content from the PDF."
+        else:
+            detail_instruction = "provide comprehensive and detailed explanations" if detailed_response else "be brief and concise"
+            combined_prompt = f"System: Please {detail_instruction} in your response.\n\n{prompt}"
+        
+        # Prepare payload
         payload = {
             "model": model_name,
             "prompt": combined_prompt,
@@ -484,75 +101,550 @@ class ModelLoader:
             }
         }
 
+        # Add image processing with vision model and embeddings
         if image_path:
-            if not os.path.exists(image_path):
-                logger.error(f"Image not found: {image_path}")
-                return "Error: Image file not found."
-            try:
-                payload["images"] = [self.encode_image_to_base64(image_path)]
-            except Exception as e:
-                logger.error(f"Image processing error: {e}")
-                return f"Error processing image: {e}"
+            processor = ImageEmbeddingProcessor()
+            image_data = processor.process_image(image_path)
+            if image_data:
+                logger.info("Using cached image analysis and embeddings")
+                enhanced_prompt = f"""System: I have analyzed this image in detail. Here's the comprehensive analysis:
 
-        try:
-            response = requests.post(self.ollama_url, json=payload)
-            logger.info(f"API Response: {response.status_code} in {time.time() - start_time:.2f}s")
-            if response.status_code != 200:
-                logger.error(f"API Error: {response.status_code}")
-                return "API request failed"
+{image_data['vision_analysis']}
 
-            response_data = response.json()
-            return response_data.get('response', 'No response')
-        
-        except Exception as e:
-            logger.error(f"Request error: {e}")
-            return f"Error: {e}"
+Based on this detailed analysis, please address the following user query:
+"{prompt}"
 
-    @staticmethod
-    def extract_text_from_pdf(pdf_path: str) -> str:
-        """Extract text from a PDF file."""
-        try:
-            with open(pdf_path, 'rb') as file:
-                reader = PyPDF2.PdfReader(file)
-                text = ''.join(page.extract_text() or '' for page in reader.pages)
-            return text.strip()
-        except Exception as e:
-            logger.error(f"Error extracting text from PDF: {e}")
-            raise
+Consider all relevant aspects from the analysis when forming your response. If the query asks about specific details, refer to the appropriate sections of the analysis."""
 
-    def handle_document_query(self, doc_path: str, query: str) -> str:
-        """Process a document and answer a query based on its content."""
-        try:
-            if doc_path.lower().endswith('.pdf'):
-                document_text = self.extract_text_from_pdf(doc_path)
+                payload = {
+                    "model": model_name,
+                    "prompt": enhanced_prompt,
+                    "images": [image_data['base64_image']],
+                    "stream": False,
+                    "options": {
+                        "num_predict": max_tokens,
+                        "temperature": temperature,
+                        "top_p": top_p,
+                        "top_k": top_k
+                    }
+                }
+                
+                if image_data.get('embeddings'):
+                    payload["embeddings"] = image_data['embeddings']
             else:
-                return "Unsupported file format."
+                # Fallback to basic image processing
+                payload["images"] = [encode_image_to_base64(image_path)]
 
-            combined_query = f"Document content:\n{document_text}\n\nUser query: {query}"
-            return self.generate_response(combined_query)
-        
-        except Exception as e:
-            logger.error(f"Document query error: {e}")
-            return f"Error processing document: {e}"
+        # Send request to Ollama server
+        response = requests.post(OLLAMA_URL, json=payload)
+        response_time = time.time() - start_time
+
+        if response.status_code != 200:
+            logger.error(f"API Error: {response.status_code} - {response.text}")
+            return "API request failed."
+
+        logger.info(f"Response received in {response_time:.2f} seconds.")
+        response_data = response.json()
+        return response_data.get('response', 'No response content.')
+
+    except requests.RequestException as e:
+        logger.error(f"Request error: {e}")
+        return f"Request failed: {e}"
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        return f"An error occurred: {e}"
+
 
 # Test script
 if __name__ == "__main__":
-    model_loader = ModelLoader()
-
-    # Existing functionality tests
-    text_response = model_loader.generate_response("What is Machine Learning?")
-    print(text_response)
-
-    # image_path = "D:\\Code\\VisiQ-GPT\\Vector.png"
-    # if os.path.exists(image_path):
-    #     image_response = model_loader.generate_response("Describe this image.", image_path=image_path)
-    #     print(image_response)
+    # # Text query test
+    # print("=========================================================================")
+    # print("------------------------------Text Processing----------------------------")          
+    # print("=========================================================================")
     
-    # New document upload feature test
-    # doc_path = "D:\\Code\\VisiQ-GPT\\Vector Database.pdf"
-    # query = "Summarize the key points."
-    # if os.path.exists(doc_path):
-    #     doc_response = model_loader.handle_document_query(doc_path, query)
-    #     print(doc_response)
+    # try:
+    #     text_response = generate_response("What is machine learning?")
+    #     print("Text Response:", text_response)
+    # except Exception as e:
+    #     logger.error(f"Text query test failed: {e}")
+
+    print("=========================================================================")
+    print("----------------------------Image Processing-----------------------------")          
+    print("=========================================================================")
+
+    # Image query test
+    image_path = "D:\\Code\\VisiQ-GPT\\data\\phone.png"
+    if os.path.exists(image_path):
+        try:
+            image_response = generate_response("Can you tell me what the battery left?", image_path=image_path)
+            print("Image Response:", image_response)
+        except Exception as e:
+            logger.error(f"Image query test failed: {e}")
+    else:
+        logger.warning(f"Image not found at {image_path}")
+
+    # print("=========================================================================")
+    # print("------------------------------PDF Processing-----------------------------")          
+    # print("=========================================================================")
+
+    # # PDF query test
+    # pdf_path = "D:\\Code\\VisiQ-GPT\\data\\Vector Database.pdf"
+    # if os.path.exists(pdf_path):
+    #     try:
+    #         # # Test with detailed response
+    #         # pdf_response = generate_response(
+    #         #     "How to make coffee",
+    #         #     pdf_path=pdf_path,
+    #         #     detailed_response=True
+    #         # )
+    #         # print("Detailed PDF Response:", pdf_response)
+            
+    #         # Test with concise response
+    #         pdf_response = generate_response(
+    #             "can you tell me page number of table 1?",
+    #             pdf_path=pdf_path,
+    #             detailed_response=False
+    #         )
+    #         print("Concise PDF Response:", pdf_response)
+    #     except Exception as e:
+    #         logger.error(f"PDF query test failed: {e}")
     # else:
-    #     print(f"Document not found at {doc_path}")
+    #     logger.warning(f"PDF not found at {pdf_path}")
+
+------------------------------------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------------------------
+
+
+# models/embeddings.py
+
+
+import chromadb
+from chromadb.utils.embedding_functions import OllamaEmbeddingFunction
+from langchain_community.document_loaders import PyMuPDFLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from sentence_transformers import CrossEncoder
+from typing import Tuple, List
+import os
+
+class EmbeddingsProcessor:
+    def __init__(self):
+        ollama_ef = OllamaEmbeddingFunction(
+            url="http://localhost:11434/api/embeddings",
+            model_name="nomic-embed-text:latest"
+        )
+        self.chroma_client = chromadb.PersistentClient(path="./demo-rag-chroma")
+        self.collection = self.chroma_client.get_or_create_collection(
+            name="rag_app",
+            embedding_function=ollama_ef,
+            metadata={"hnsw:space": "cosine"}
+        )
+
+    def process_pdf(self, pdf_path: str) -> Tuple[str, None]:
+        loader = PyMuPDFLoader(pdf_path)
+        docs = loader.load()
+        
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=400,
+            chunk_overlap=100,
+            separators=["\n\n", "\n", ".", "?", "!", " ", ""]
+        )
+        splits = text_splitter.split_documents(docs)
+        
+        documents, metadatas, ids = [], [], []
+        for idx, split in enumerate(splits):
+            documents.append(split.page_content)
+            metadatas.append(split.metadata)
+            ids.append(f"{os.path.basename(pdf_path)}_{idx}")
+
+        self.collection.upsert(
+            documents=documents,
+            metadatas=metadatas,
+            ids=ids
+        )
+        
+        return " ".join(documents), None
+
+    def query_similar_content(self, query: str, prompt: str, n_results: int = 3):
+        """Query the vector store for similar content and validate relevance."""
+        results = self.collection.query(
+            query_texts=[prompt],
+            n_results=n_results
+        )
+        
+        if not results['documents'][0]:
+            return None, False
+            
+        # Use the same re-ranking approach as app_doc_embed.py
+        encoder_model = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
+        ranks = encoder_model.rank(prompt, results['documents'][0], top_k=3)
+        
+        relevant_text = ""
+        for rank in ranks:
+            relevant_text += results['documents'][0][rank["corpus_id"]]
+            
+        # Check if we found any relevant content
+        if not relevant_text:
+            return None, False
+            
+        return relevant_text, True
+
+
+
+
+--------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------
+
+
+# models/image_embed.py
+
+import os
+import base64
+import hashlib
+import json
+from pathlib import Path
+from typing import Optional, Dict
+import requests
+from datetime import datetime, timedelta
+
+class ImageEmbeddingProcessor:
+    def __init__(self, cache_dir: str = "./image_cache"):
+        self.cache_dir = Path(cache_dir)
+        self.cache_dir.mkdir(exist_ok=True)
+        self.ollama_url = "http://localhost:11434/api/generate"
+        self.embedding_url = "http://localhost:11434/api/embeddings"
+        self.cache_duration = timedelta(days=7)
+
+    def _get_image_hash(self, image_path: str) -> str:
+        """Generate unique hash for image file."""
+        image_stat = os.stat(image_path)
+        return hashlib.md5(f"{image_path}{image_stat.st_mtime}".encode()).hexdigest()
+
+    def _get_image_analysis(self, base64_image: str) -> Optional[str]:
+        """Get detailed image analysis using llama3.2-vision."""
+        detailed_prompt = """Analyze this image in extreme detail. Structure your analysis as follows:
+
+1. General Overview:
+   - Main subject/focus
+   - Overall composition
+   - Time of day/lighting conditions
+   - Color palette
+
+2. Key Elements:
+   - Foreground elements and their details
+   - Background elements and their details
+   - Any text or symbols present
+   - Notable patterns or textures
+
+3. Technical Details:
+   - Image quality and clarity
+   - Perspective and depth
+   - Lighting and shadows
+
+
+4. Contextual Information:
+   - Setting/environment
+   - Mood/atmosphere
+   - Apparent purpose or context
+   - Any cultural or historical references
+
+5. Additional Details:
+   - Small or subtle elements
+   - Interesting features
+   - Any unique or unusual aspects
+
+6. If textual image provided:
+    - Analyze and process the text inside the image (if any) and its relevance to the overall image and user query.
+    - Note any discrepancies between text and image
+    - Provide any additional insights or interpretations
+
+7. If you think any answer to user query can be inferred from the image, provide that as well in short and concise manner.
+
+
+Please be thorough and precise in your analysis, noting even minor details that might be relevant for future queries. Provide Response fast and accurate."""
+
+        try:
+            response = requests.post(
+                self.ollama_url,
+                json={
+                    "model": "llama3.2-vision",
+                    "prompt": detailed_prompt,
+                    "images": [base64_image],
+                    "options": {
+                        "temperature": 0.2,  # Slightly increased for more natural language
+                        "num_predict": 500   # Increased for more detailed response
+                    }
+                }
+            )
+            if response.status_code == 200:
+                return response.json().get('response', None)
+            return None
+        except Exception as e:
+            print(f"Error analyzing image: {e}")
+            return None
+
+    def _get_image_embedding(self, base64_image: str) -> Optional[list]:
+        """Get embeddings using nomic-embed-text."""
+        try:
+            response = requests.post(
+                self.embedding_url,
+                json={
+                    "model": "nomic-embed-text",
+                    "prompt": "",
+                    "images": [base64_image]
+                }
+            )
+            if response.status_code == 200:
+                return response.json().get('embeddings', None)
+            return None
+        except Exception as e:
+            print(f"Error getting embeddings: {e}")
+            return None
+
+    def process_image(self, image_path: str) -> Dict[str, any]:
+        """Process image using vision model and embeddings."""
+        try:
+            image_hash = self._get_image_hash(image_path)
+            cache_file = self.cache_dir / f"{image_hash}.json"
+
+            # Check cache
+            if cache_file.exists():
+                cache_data = json.loads(cache_file.read_text())
+                cache_time = datetime.fromisoformat(cache_data['timestamp'])
+                if datetime.now() - cache_time < self.cache_duration:
+                    return cache_data
+
+            # Read and encode image
+            with open(image_path, "rb") as image_file:
+                base64_image = base64.b64encode(image_file.read()).decode('utf-8')
+
+            # Get both analysis and embeddings
+            vision_analysis = self._get_image_analysis(base64_image)
+            embeddings = self._get_image_embedding(base64_image)
+
+            # Cache results
+            cache_data = {
+                'base64_image': base64_image,
+                'vision_analysis': vision_analysis,
+                'embeddings': embeddings,
+                'timestamp': datetime.now().isoformat(),
+                'path': str(image_path)
+            }
+            cache_file.write_text(json.dumps(cache_data))
+            return cache_data
+
+        except Exception as e:
+            print(f"Error processing image: {e}")
+            return None
+
+
+
+
+
+#api/process_routes.py
+from fastapi import APIRouter, File, UploadFile, Form, HTTPException
+from typing import Optional
+import os
+from models.model_loader import generate_response
+from pydantic import BaseModel, ConfigDict
+import tempfile
+import shutil
+from models.db_manager import MongoDBManager
+
+router = APIRouter()
+
+class QueryRequest(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+    
+    prompt: str
+    model_name: Optional[str] = "llama3.2-vision"
+    max_tokens: Optional[int] = 800
+    temperature: Optional[float] = 0.7
+    top_p: Optional[float] = 0.9
+    top_k: Optional[int] = 40
+    detailed_response: Optional[bool] = True
+    session_id: Optional[str] = None
+
+@router.post("/chat")
+async def process_chat(
+    request: QueryRequest,
+    file: Optional[UploadFile] = File(None)
+):
+    try:
+        db_manager = MongoDBManager()
+        session_id = request.session_id
+        
+        # If no session_id provided, create a new one
+        if not session_id:
+            session_id = db_manager.create_session()
+            
+        temp_path = None
+        file_type = None
+        
+        if file:
+            # Determine file type
+            if file.filename.lower().endswith('.pdf'):
+                suffix = '.pdf'
+                file_type = 'pdf'
+            else:
+                suffix = ''
+                file_type = 'image'
+                
+            # Save uploaded file
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
+                shutil.copyfileobj(file.file, temp_file)
+                temp_path = temp_file.name
+                
+            # Store file in session history
+            db_manager.update_session_file(session_id, temp_path, file_type)
+        else:
+            # Get last file from session history
+            last_file = db_manager.get_session_file(session_id)
+            if last_file:
+                temp_path = last_file['file_path']
+                file_type = last_file['file_type']
+
+        # Generate response based on file type
+        if file_type == 'pdf':
+            response = generate_response(
+                prompt=request.prompt,
+                model_name=request.model_name,
+                pdf_path=temp_path,
+                max_tokens=request.max_tokens,
+                temperature=request.temperature,
+                top_p=request.top_p,
+                top_k=request.top_k,
+                detailed_response=request.detailed_response
+            )
+        elif file_type == 'image':
+            response = generate_response(
+                prompt=request.prompt,
+                model_name=request.model_name,
+                image_path=temp_path,
+                max_tokens=request.max_tokens,
+                temperature=request.temperature,
+                top_p=request.top_p,
+                top_k=request.top_k,
+                detailed_response=request.detailed_response
+            )
+        else:
+            response = generate_response(
+                prompt=request.prompt,
+                model_name=request.model_name,
+                max_tokens=request.max_tokens,
+                temperature=request.temperature,
+                top_p=request.top_p,
+                top_k=request.top_k,
+                detailed_response=request.detailed_response
+            )
+
+        # Store conversation history
+        db_manager.add_conversation_history(
+            session_id=session_id,
+            prompt=request.prompt,
+            response=response
+        )
+
+        # Clean up temporary file if it was just uploaded
+        if file and temp_path:
+            os.unlink(temp_path)
+
+        return {
+            "session_id": session_id,
+            "response": response
+        }
+    except Exception as e:
+        if temp_path and os.path.exists(temp_path):
+            os.unlink(temp_path)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/text")
+async def process_text(request: QueryRequest):
+    try:
+        response = generate_response(
+            prompt=request.prompt,
+            model_name=request.model_name,
+            max_tokens=request.max_tokens,
+            temperature=request.temperature,
+            top_p=request.top_p,
+            top_k=request.top_k,
+            detailed_response=request.detailed_response
+        )
+        return {"response": response}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/image")
+async def process_image(
+    file: UploadFile = File(...),
+    prompt: str = Form(...),
+    model_name: Optional[str] = Form("llama3.2-vision"),
+    max_tokens: Optional[int] = Form(800),
+    temperature: Optional[float] = Form(0.7),
+    top_p: Optional[float] = Form(0.9),
+    top_k: Optional[int] = Form(40),
+    detailed_response: Optional[bool] = Form(True)
+):
+    try:
+        # Create temporary file
+        with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+            shutil.copyfileobj(file.file, temp_file)
+            temp_path = temp_file.name
+
+        response = generate_response(
+            prompt=prompt,
+            model_name=model_name,
+            image_path=temp_path,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            top_p=top_p,
+            top_k=top_k,
+            detailed_response=detailed_response
+        )
+
+        # Clean up temporary file
+        os.unlink(temp_path)
+        return {"response": response}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/pdf")
+async def process_pdf(
+    file: UploadFile = File(...),
+    prompt: str = Form(...),
+    model_name: Optional[str] = Form("llama3.2-vision"),
+    max_tokens: Optional[int] = Form(800),
+    temperature: Optional[float] = Form(0.7),
+    top_p: Optional[float] = Form(0.9),
+    top_k: Optional[int] = Form(40),
+    detailed_response: Optional[bool] = Form(True)
+):
+    try {
+        # Create temporary file
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
+            shutil.copyfileobj(file.file, temp_file)
+            temp_path = temp_file.name
+
+        response = generate_response(
+            prompt=prompt,
+            model_name=model_name,
+            pdf_path=temp_path,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            top_p=top_p,
+            top_k=top_k,
+            detailed_response=detailed_response
+        )
+
+        # Clean up temporary file
+        os.unlink(temp_path)
+        return {"response": response}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/")
+async def root():
+    return {
+        "message": "Welcome to VisiQ-GPT API",
+        "docs": "/docs",
+        "redoc": "/redoc"
+    }
